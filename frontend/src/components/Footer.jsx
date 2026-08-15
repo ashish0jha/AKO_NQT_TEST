@@ -6,7 +6,7 @@ export default function Footer() {
         <div className="footer-top">
           <div className="footer-brand">
             <a href="/" className="brand">
-              Admit<span>.</span>
+              AKO<span>.</span>
             </a>
             <p className="footer-tagline">
               A full-length, exam-console mock test that mirrors the TCS NQT section pattern —
@@ -24,7 +24,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {year} Admit. Independent practice tool — not affiliated with or endorsed by TCS.</span>
+          <span>© {year} AKO. Independent practice tool — not affiliated with or endorsed by TCS.</span>
           <span>Built for practice, not proctoring.</span>
         </div>
       </div>
