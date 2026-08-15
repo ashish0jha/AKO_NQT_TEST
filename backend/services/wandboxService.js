@@ -40,11 +40,22 @@ export async function runSubmission({ sourceCode, stdin }) {
         options: OPTIONS,
         save: false,
       },
-      { headers: { "Content-Type": "application/json" } }
+      {
+        headers: { "Content-Type": "application/json" },
+        // Wandbox is a free public service with no published SLA. Without a
+        // timeout, a slow/hung response left the final coding submit stuck
+        // indefinitely with no feedback (7 sequential test-case requests,
+        // any one of which could hang forever). Fail fast instead so the
+        // candidate sees a clear error rather than a frozen "Submitting...".
+        timeout: 20000,
+      }
     ));
   } catch (err) {
+    const timedOut = err.code === "ECONNABORTED";
     throw new Error(
-      `Wandbox request failed: ${err.response?.status || ""} ${err.message}`.trim()
+      timedOut
+        ? "Wandbox took too long to respond. Try again in a moment."
+        : `Wandbox request failed: ${err.response?.status || ""} ${err.message}`.trim()
     );
   }
 

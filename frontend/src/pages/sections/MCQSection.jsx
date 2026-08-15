@@ -21,6 +21,8 @@ export default function MCQSection({ attemptId, step, onDone }) {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [reportText, setReportText] = useState("");
   const [reportSent, setReportSent] = useState(false);
+  const [reportError, setReportErrorMsg] = useState("");
+  const [sendingReport, setSendingReport] = useState(false);
 
   useEffect(() => {
     api
@@ -62,6 +64,11 @@ export default function MCQSection({ attemptId, step, onDone }) {
     }
     if (current < questions.length - 1) {
       setCurrent((c) => c + 1);
+    } else if (!markReview) {
+      // Save & Next on the LAST question used to be a dead-end no-op
+      // (nowhere left to advance to). It now offers the same
+      // submit-or-review confirmation the Submit button shows.
+      setShowSubmitConfirm(true);
     }
   }
 
@@ -96,6 +103,8 @@ export default function MCQSection({ attemptId, step, onDone }) {
 
   async function sendReport() {
     if (!reportText.trim()) return;
+    setSendingReport(true);
+    setReportErrorMsg("");
     try {
       await api.post(`/attempts/${attemptId}/report-error`, {
         sectionKey: step.key,
@@ -107,9 +116,12 @@ export default function MCQSection({ attemptId, step, onDone }) {
         setReportSent(false);
         setShowReportError(false);
       }, 1200);
-    } catch {
-      // best-effort only, don't block the test
-      setShowReportError(false);
+    } catch (err) {
+      setReportErrorMsg(
+        err.response?.data?.message || "Couldn't submit the report — check your connection and try again."
+      );
+    } finally {
+      setSendingReport(false);
     }
   }
 
@@ -202,7 +214,14 @@ export default function MCQSection({ attemptId, step, onDone }) {
       )}
 
       {showReportError && (
-        <Modal title="Report an Error" onClose={() => setShowReportError(false)} width="440px">
+        <Modal
+          title="Report an Error"
+          onClose={() => {
+            setShowReportError(false);
+            setReportErrorMsg("");
+          }}
+          width="440px"
+        >
           {reportSent ? (
             <p className="word-ok">Thanks, your report was submitted.</p>
           ) : (
@@ -215,12 +234,23 @@ export default function MCQSection({ attemptId, step, onDone }) {
                 onChange={(e) => setReportText(e.target.value)}
                 placeholder="e.g. none of the options are correct..."
               />
+              {reportError && <div className="alert-error">{reportError}</div>}
               <div className="confirm-dialog-actions">
-                <button className="btn btn-ghost" onClick={() => setShowReportError(false)}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setShowReportError(false);
+                    setReportErrorMsg("");
+                  }}
+                >
                   Cancel
                 </button>
-                <button className="btn btn-primary" onClick={sendReport} disabled={!reportText.trim()}>
-                  Submit Report
+                <button
+                  className="btn btn-primary"
+                  onClick={sendReport}
+                  disabled={!reportText.trim() || sendingReport}
+                >
+                  {sendingReport ? "Submitting..." : "Submit Report"}
                 </button>
               </div>
             </>

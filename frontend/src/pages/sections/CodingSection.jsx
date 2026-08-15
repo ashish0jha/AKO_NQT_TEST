@@ -16,6 +16,7 @@ export default function CodingSection({ attemptId, step, onDone }) {
   const [runResults, setRunResults] = useState(null);
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const submittedRef = useRef(false);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function CodingSection({ attemptId, step, onDone }) {
     if (submittedRef.current) return;
     submittedRef.current = true;
     setSubmitting(true);
+    setSubmitError("");
     try {
       const { data } = await api.post(`/coding/${attemptId}/section/${step.key}/submit`, {
         language,
@@ -52,11 +54,24 @@ export default function CodingSection({ attemptId, step, onDone }) {
     } catch (err) {
       submittedRef.current = false;
       setSubmitting(false);
+      setSubmitError(
+        err.response?.data?.message ||
+          "Couldn't evaluate your submission — this is usually a slow/unavailable compiler service. Try again."
+      );
     }
   }
 
   if (loadError) return <SectionLoadError message={loadError} />;
   if (!problem) return <div className="page-center">Generating your coding problem...</div>;
+
+  if (submitting) {
+    return (
+      <div className="page-center page-center-col">
+        <p>Evaluating your code against all test cases...</p>
+        <p className="muted small">This runs your solution through the full test suite - it can take up to a minute.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="section-shell">
@@ -64,6 +79,12 @@ export default function CodingSection({ attemptId, step, onDone }) {
         <h2>{step.label}</h2>
         <Timer durationSec={step.durationSec} onExpire={submit} resetKey={step.key} />
       </div>
+
+      {submitError && (
+        <div className="alert-error">
+          {submitError} <button className="link-btn" onClick={submit}>Try again</button>
+        </div>
+      )}
 
       <div className="coding-layout">
         <div className="card coding-statement">

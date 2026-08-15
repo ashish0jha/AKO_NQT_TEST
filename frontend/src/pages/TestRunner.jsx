@@ -19,6 +19,7 @@ export default function TestRunner() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [quitting, setQuitting] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState("");
   const [loadingAttempt, setLoadingAttempt] = useState(true);
 
   const step = STEPS[stepIndex];
@@ -80,8 +81,16 @@ export default function TestRunner() {
 
   async function finishAttempt() {
     setFinishing(true);
-    await api.post(`/attempts/${attemptId}/complete`);
-    navigate(`/results/${attemptId}`);
+    setFinishError("");
+    try {
+      await api.post(`/attempts/${attemptId}/complete`);
+      navigate(`/results/${attemptId}`);
+    } catch (err) {
+      setFinishing(false);
+      setFinishError(
+        err.response?.data?.message || "Couldn't finish scoring your test. Check your connection and try again."
+      );
+    }
   }
 
   async function confirmQuit() {
@@ -103,6 +112,17 @@ export default function TestRunner() {
 
   if (finishing) {
     return <div className="page-center">Scoring your test...</div>;
+  }
+
+  if (finishError) {
+    return (
+      <div className="page-center page-center-col">
+        <p>{finishError}</p>
+        <button className="btn btn-primary" onClick={finishAttempt}>
+          Try again
+        </button>
+      </div>
+    );
   }
 
   return (

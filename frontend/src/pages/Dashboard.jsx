@@ -55,7 +55,7 @@ export default function Dashboard() {
     <div className="container">
       <section className="ticket">
         <div className="ticket-main">
-          <span className="ticket-eyebrow">AKO card</span>
+          <span className="ticket-eyebrow">Admit card</span>
           <h1>TCS NQT-style Mock Test</h1>
           <p className="muted">
             81 items across 7 groups, 192 minutes total — matching the official pattern exactly.

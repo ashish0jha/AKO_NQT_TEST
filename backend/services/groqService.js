@@ -148,7 +148,7 @@ function isValidMCQ(q) {
  * shipping a shorter section than the test format requires.
  */
 export async function generateMCQSet(apiKey, sectionLabel, count) {
-  const system = `You are an expert item-writer for corporate pre-employment aptitude tests (like Cognizant GenC PNQT). ${JSON_ONLY_RULE}`;
+  const system = `You are an expert item-writer for ADVANCED corporate pre-employment aptitude tests (like the harder tier of TCS NQT / Cognizant GenC PNQT). You write multi-step questions, not single-step recall, and you are meticulous about correctness. ${JSON_ONLY_RULE}`;
   const topics = pickTopics(mcqPoolFor(sectionLabel), Math.min(count, 6));
   const collected = [];
   const seenPrompts = new Set();
@@ -163,13 +163,18 @@ export async function generateMCQSet(apiKey, sectionLabel, count) {
       : "";
     const user = `Generate exactly ${remaining} multiple-choice questions for the section "${sectionLabel}".
 Distribute the questions across these specific sub-topics (use each at least once, repeat/mix as needed to reach ${remaining}): ${topics.join(", ")}.
+
+Difficulty: ADVANCED, not beginner. Each question must require at least two reasoning/calculation steps chained together (e.g. combine two concepts, require an intermediate value before the final answer, or need careful elimination of close distractors) — not a single-formula plug-in or a fact any candidate would already know by heart. Still solvable within about 60-75 seconds by a well-prepared candidate.
+
+Before finalizing each question: solve it yourself step by step internally, compute the exact correct value/answer, double-check your arithmetic and logic, and confirm exactly ONE of the 4 options matches your solution while the other 3 are plausible-but-wrong distractors (not vague, not off-by-a-trivial-amount duplicates, not multiple options that could both be argued correct). If you find an error or ambiguity while checking, fix the question before including it — never include a question you have not verified this way.
+
 Return JSON: {"questions": [{"prompt": string, "options": [4 strings], "correctAnswer": string (must exactly match one option), "explanation": string}]}
 Every item MUST have exactly 4 options and a correctAnswer that exactly matches one of them. You MUST return exactly ${remaining} items — not fewer.
 Use fresh numbers/names/scenarios — do not reuse the most common textbook example for a topic.${avoid}
 [session ${nonce()}]`;
     const result = await callGroqJSON(apiKey, system, user, {
-      temperature: 1.0,
-      maxTokens: tokenBudget(140, remaining),
+      temperature: 0.9,
+      maxTokens: tokenBudget(180, remaining),
     });
     const batch = Array.isArray(result.questions) ? result.questions.filter(isValidMCQ) : [];
     for (const q of batch) {
@@ -200,7 +205,7 @@ function isValidBlank(item) {
 
 /** Same top-up strategy as generateMCQSet, for the same reason. */
 export async function generateSentenceCompletion(apiKey, count) {
-  const system = `You write "sentence completion" items for verbal-ability aptitude tests. ${JSON_ONLY_RULE}`;
+  const system = `You write "sentence completion" items for the ADVANCED tier of verbal-ability aptitude tests. You are meticulous about each item having exactly one defensible correct answer. ${JSON_ONLY_RULE}`;
   const collected = [];
   const seenPrompts = new Set();
 
@@ -214,12 +219,15 @@ export async function generateSentenceCompletion(apiKey, count) {
       : "";
     const user = `Generate exactly ${remaining} sentences, each with exactly one blank (shown as "_____"), where a single word best completes the sentence's meaning.
 Cover a mix of everyday, workplace, and general-knowledge contexts. Avoid reusing well-known textbook example sentences.
+
+Difficulty: ADVANCED. Use moderately sophisticated vocabulary (not basic/everyday words like "happy" or "big") and sentence structures where the surrounding context genuinely has to be read carefully — avoid sentences where several common words could all fit equally well. Before finalizing each item, check that your chosen word is clearly the single best fit given the full sentence's meaning and tone, not just "a" word that fits grammatically.
+
 Return JSON: {"items": [{"prompt": "sentence with _____", "correctAnswer": "single word"}]}
 You MUST return exactly ${remaining} items — not fewer.${avoid}
 [session ${nonce()}]`;
     const result = await callGroqJSON(apiKey, system, user, {
-      temperature: 1.0,
-      maxTokens: tokenBudget(60, remaining, 800),
+      temperature: 0.9,
+      maxTokens: tokenBudget(70, remaining, 800),
     });
     const batch = Array.isArray(result.items) ? result.items.filter(isValidBlank) : [];
     for (const q of batch) {
@@ -259,14 +267,21 @@ Return JSON: {"situation": string, "toneGuidance": string}
 }
 
 export async function generateCodingProblem(apiKey, difficulty) {
-  const system = `You write hands-on coding problems for an online-assessment platform. Problems must have a single unambiguous correct output per input, no floating point ambiguity, and no ambiguous formatting. ${JSON_ONLY_RULE}`;
+  const system = `You write hands-on coding problems for an online-assessment platform. Problems must have a single unambiguous correct output per input, no floating point ambiguity, and no ambiguous formatting. You are meticulous: you mentally trace through your own test cases before finalizing to make sure every input/output pair is actually correct. ${JSON_ONLY_RULE}`;
   const topic = pickTopics(CODING_TOPIC_POOL, 1)[0];
   const flavor = pickTopics(CODING_FLAVOR_POOL, 1)[0];
+  const difficultyNote =
+    difficulty === "easy"
+      ? "Should require combining the technique with at least one extra twist (an edge case to handle, a second pass over the data, or a small transformation) — not a single-line trivial application of it."
+      : "Should require layering the technique with a second concept (e.g. the technique plus sorting, plus a greedy choice, plus state tracking) so it takes real problem-solving, not just recognizing a textbook pattern.";
   const user = `Generate one ${difficulty} coding problem solvable in C++ within ${
     difficulty === "easy" ? "35" : "55"
   } minutes.
-Base it on this core technique: ${topic}. Wrap it in this scenario: ${flavor}.
+Base it on this core technique: ${topic}. Wrap it in this scenario: ${flavor}. ${difficultyNote}
 Do not reuse a well-known textbook problem verbatim (e.g. plain "reverse a string", "FizzBuzz", "check palindrome") — invent a distinct problem that uses the technique.
+
+Before finalizing: mentally trace through the actual algorithm for each test case input you write, step by step, and confirm the output you wrote is EXACTLY what that algorithm produces (including formatting, spacing, and edge cases like empty input or ties) — do not guess an output.
+
 Return JSON:
 {
   "title": string,
@@ -276,7 +291,7 @@ Return JSON:
 }
 Inputs/outputs must be exact strings as they'd be fed to stdin and expected on stdout (no trailing explanations).
 [session ${nonce()}]`;
-  return callGroqJSON(apiKey, system, user, { temperature: 0.85, maxTokens: 2200 });
+  return callGroqJSON(apiKey, system, user, { temperature: 0.8, maxTokens: 2400 });
 }
 
 export async function scoreSentenceCompletion(apiKey, prompt, correctAnswer, userAnswer) {

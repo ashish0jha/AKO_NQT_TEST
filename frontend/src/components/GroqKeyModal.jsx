@@ -63,6 +63,19 @@ export default function GroqKeyModal({ onClose, onSaved }) {
         to whoever deployed it. Groq's free tier is generous enough for a full mock test.
       </p>
 
+      <div className="groq-key-safety">
+        <span className="groq-key-safety-icon">🔒</span>
+        <div>
+          <strong>Your key is encrypted and safe.</strong>
+          <p className="muted small">
+            It's encrypted (AES-256) before it's ever saved, and stored in that encrypted form —
+            never as plain text. It's never shown to other users, never displayed back to you
+            after saving (only a masked preview like <span className="mono">gsk_••••••••ab12</span>),
+            and is used only on the server to call Groq on your behalf when you take a test.
+          </p>
+        </div>
+      </div>
+
       <div className="groq-key-steps">
         <h4>How to get a free key</h4>
         <ol className="instructions-list">
@@ -106,6 +119,7 @@ export default function GroqKeyModal({ onClose, onSaved }) {
         onChange={(e) => setApiKey(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && save()}
       />
+      <p className="muted small groq-key-input-note">🔒 Encrypted before it's stored — safe to paste here.</p>
 
       <div className="confirm-dialog-actions">
         {preview && (

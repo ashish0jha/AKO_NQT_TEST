@@ -12,7 +12,7 @@ export default function Navbar() {
   return (
     <header className="navbar">
       <Link to="/" className="brand">
-        AKO<span>.</span>
+        Admit<span>.</span>
       </Link>
       <nav>
         {user ? (
