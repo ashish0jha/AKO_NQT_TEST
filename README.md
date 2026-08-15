@@ -1,4 +1,4 @@
-# Admit — TCS NQT-style Mock Test App
+# AKO — TCS NQT-style Mock Test App
 
 A full-stack mock assessment platform that reproduces the exact section/timing
 pattern from your `Subject_Specific_Instructions_PNQT.pdf`:
