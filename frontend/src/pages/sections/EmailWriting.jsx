@@ -9,12 +9,15 @@ export default function EmailWriting({ attemptId, step, onDone }) {
   const [text, setText] = useState("");
   const submittedRef = useRef(false);
 
-  useEffect(() => {
+  function loadSection() {
+    setLoadError(null);
     api
       .get(`/attempts/${attemptId}/section/${step.key}`)
       .then(({ data }) => setSituation(data.questions[0].prompt))
       .catch((err) => setLoadError(err.response?.data?.message));
-  }, [attemptId, step.key]);
+  }
+
+  useEffect(loadSection, [attemptId, step.key]);
 
   async function submit() {
     if (submittedRef.current) return;
@@ -25,7 +28,7 @@ export default function EmailWriting({ attemptId, step, onDone }) {
     onDone(data.sectionScore);
   }
 
-  if (loadError) return <SectionLoadError message={loadError} />;
+  if (loadError) return <SectionLoadError message={loadError} onRetry={loadSection} />;
   if (!situation) return <div className="page-center">Generating your email prompt...</div>;
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import api from "../../api/axios.js";
 import Timer from "../../components/Timer.jsx";
 import QuestionPalette from "../../components/QuestionPalette.jsx";
@@ -24,7 +24,8 @@ export default function MCQSection({ attemptId, step, onDone }) {
   const [reportError, setReportErrorMsg] = useState("");
   const [sendingReport, setSendingReport] = useState(false);
 
-  useEffect(() => {
+  function loadSection() {
+    setLoadError(null);
     api
       .get(`/attempts/${attemptId}/section/${step.key}`)
       .then(({ data }) => {
@@ -32,12 +33,23 @@ export default function MCQSection({ attemptId, step, onDone }) {
         setVisited({ 0: true });
       })
       .catch((err) => setLoadError(err.response?.data?.message));
-  }, [attemptId, step.key]);
+  }
+
+  useEffect(loadSection, [attemptId, step.key]);
 
   // Whenever the open question changes, load its draft from whatever is
   // already committed (jumping away without saving discards the draft, by
   // design, exactly like the reference exam UI).
-  useEffect(() => {
+  //
+  // This MUST run before paint (useLayoutEffect, not useEffect): setCurrent
+  // and setAnswers both update in the same render, but `draft` itself only
+  // gets reset here. With a plain useEffect (which fires after paint), the
+  // browser could briefly render the NEW question with the OLD draft value
+  // still set — and since MCQ options often reuse the same text across
+  // questions ("True", "10", "None of the above"), that stale draft would
+  // visibly show as pre-selected/already-answered on a question the
+  // candidate hadn't touched yet.
+  useLayoutEffect(() => {
     setDraft(answers[current] ?? null);
     setVisited((v) => (v[current] ? v : { ...v, [current]: true }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,7 +137,7 @@ export default function MCQSection({ attemptId, step, onDone }) {
     }
   }
 
-  if (loadError) return <SectionLoadError message={loadError} />;
+  if (loadError) return <SectionLoadError message={loadError} onRetry={loadSection} />;
   if (!questions) return <div className="page-center">Generating {step.label} questions...</div>;
 
   const q = questions[current];

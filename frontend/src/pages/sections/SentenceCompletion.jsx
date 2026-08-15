@@ -11,12 +11,15 @@ export default function SentenceCompletion({ attemptId, step, onDone }) {
   const [answers, setAnswers] = useState({});
   const submittedRef = useRef(false);
 
-  useEffect(() => {
+  function loadSection() {
+    setLoadError(null);
     api
       .get(`/attempts/${attemptId}/section/${step.key}`)
       .then(({ data }) => setQuestions(data.questions))
       .catch((err) => setLoadError(err.response?.data?.message));
-  }, [attemptId, step.key]);
+  }
+
+  useEffect(loadSection, [attemptId, step.key]);
 
   function goNext(currentWord) {
     const answer = (currentWord ?? word).trim().split(/\s+/)[0] || "";
@@ -45,7 +48,7 @@ export default function SentenceCompletion({ attemptId, step, onDone }) {
     onDone(data.sectionScore);
   }
 
-  if (loadError) return <SectionLoadError message={loadError} />;
+  if (loadError) return <SectionLoadError message={loadError} onRetry={loadSection} />;
   if (!questions) return <div className="page-center">Generating sentence completion items...</div>;
 
   const q = questions[current];

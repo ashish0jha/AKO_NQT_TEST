@@ -19,12 +19,15 @@ export default function CodingSection({ attemptId, step, onDone }) {
   const [submitError, setSubmitError] = useState("");
   const submittedRef = useRef(false);
 
-  useEffect(() => {
+  function loadSection() {
+    setLoadError(null);
     api
       .get(`/coding/${attemptId}/section/${step.key}`)
       .then(({ data }) => setProblem(data))
       .catch((err) => setLoadError(err.response?.data?.message));
-  }, [attemptId, step.key]);
+  }
+
+  useEffect(loadSection, [attemptId, step.key]);
 
   async function runPublic() {
     setRunning(true);
@@ -61,7 +64,7 @@ export default function CodingSection({ attemptId, step, onDone }) {
     }
   }
 
-  if (loadError) return <SectionLoadError message={loadError} />;
+  if (loadError) return <SectionLoadError message={loadError} onRetry={loadSection} />;
   if (!problem) return <div className="page-center">Generating your coding problem...</div>;
 
   if (submitting) {

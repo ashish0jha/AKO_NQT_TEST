@@ -12,12 +12,15 @@ export default function PassageRecall({ attemptId, step, onDone }) {
   const [answers, setAnswers] = useState({});
   const submittedRef = useRef(false);
 
-  useEffect(() => {
+  function loadSection() {
+    setLoadError(null);
     api
       .get(`/attempts/${attemptId}/section/${step.key}`)
       .then(({ data }) => setPassages(data.questions))
       .catch((err) => setLoadError(err.response?.data?.message));
-  }, [attemptId, step.key]);
+  }
+
+  useEffect(loadSection, [attemptId, step.key]);
 
   function startWriting() {
     setPhase("writing");
@@ -50,7 +53,7 @@ export default function PassageRecall({ attemptId, step, onDone }) {
     onDone(data.sectionScore);
   }
 
-  if (loadError) return <SectionLoadError message={loadError} />;
+  if (loadError) return <SectionLoadError message={loadError} onRetry={loadSection} />;
   if (!passages) return <div className="page-center">Generating passages...</div>;
 
   const p = passages[current];

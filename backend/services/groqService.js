@@ -18,29 +18,53 @@ function client(apiKey) {
  * apiKey is always the CANDIDATE's own key (see models/User.js /
  * middleware/auth.js requireGroqKey) — every attempt runs on the test-taker's
  * own Groq quota, not a shared server-side key.
+ *
+ * Retries the whole call (fresh generation, not just re-parsing the same
+ * text) up to `retries` times if the response comes back malformed/
+ * truncated - this used to be a hard failure on the first bad response,
+ * which is what made loading a section occasionally take several manual
+ * page-reloads before it happened to succeed. Auth/rate-limit errors are
+ * NOT retried since they'll just fail identically every time.
  */
-async function callGroqJSON(apiKey, systemPrompt, userPrompt, { temperature = 0.8, maxTokens = 4000 } = {}) {
+async function callGroqJSON(
+  apiKey,
+  systemPrompt,
+  userPrompt,
+  { temperature = 0.8, maxTokens = 4000, retries = 2 } = {}
+) {
   const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
   const api = client(apiKey);
-  const { data } = await api.post("/chat/completions", {
-    model,
-    temperature,
-    max_tokens: maxTokens,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
-  });
 
-  const text = data?.choices?.[0]?.message?.content ?? "{}";
-  try {
-    return JSON.parse(text);
-  } catch {
-    // fallback: strip code fences if the model added them anyway
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleaned);
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const { data } = await api.post("/chat/completions", {
+        model,
+        temperature,
+        max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const text = data?.choices?.[0]?.message?.content ?? "{}";
+      try {
+        return JSON.parse(text);
+      } catch {
+        // fallback: strip code fences if the model added them anyway
+        const cleaned = text.replace(/```json|```/g, "").trim();
+        return JSON.parse(cleaned);
+      }
+    } catch (err) {
+      lastErr = err;
+      if (err.response && [401, 403, 429].includes(err.response.status)) {
+        throw err; // bad/rate-limited key - retrying won't help
+      }
+    }
   }
+  throw lastErr;
 }
 
 const JSON_ONLY_RULE =
@@ -166,7 +190,7 @@ Distribute the questions across these specific sub-topics (use each at least onc
 
 Difficulty: ADVANCED, not beginner. Each question must require at least two reasoning/calculation steps chained together (e.g. combine two concepts, require an intermediate value before the final answer, or need careful elimination of close distractors) — not a single-formula plug-in or a fact any candidate would already know by heart. Still solvable within about 60-75 seconds by a well-prepared candidate.
 
-Before finalizing each question: solve it yourself step by step internally, compute the exact correct value/answer, double-check your arithmetic and logic, and confirm exactly ONE of the 4 options matches your solution while the other 3 are plausible-but-wrong distractors (not vague, not off-by-a-trivial-amount duplicates, not multiple options that could both be argued correct). If you find an error or ambiguity while checking, fix the question before including it — never include a question you have not verified this way.
+Before finalizing each question: solve it yourself step by step internally, compute the exact correct value/answer, double-check your arithmetic and logic, and confirm exactly ONE of the 4 options matches your solution while the other 3 are plausible-but-wrong distractors (not vague, not off-by-a-trivial-amount duplicates, not multiple options that could both be argued correct). If you find an error or ambiguity while checking, fix the question before including it — never include a question you have not verified this way. Do this checking silently in your own reasoning — do NOT write out your steps or show your work anywhere in the output. Each item's "explanation" field must be ONE short sentence stating the answer, not your working.
 
 Return JSON: {"questions": [{"prompt": string, "options": [4 strings], "correctAnswer": string (must exactly match one option), "explanation": string}]}
 Every item MUST have exactly 4 options and a correctAnswer that exactly matches one of them. You MUST return exactly ${remaining} items — not fewer.
@@ -174,7 +198,7 @@ Use fresh numbers/names/scenarios — do not reuse the most common textbook exam
 [session ${nonce()}]`;
     const result = await callGroqJSON(apiKey, system, user, {
       temperature: 0.9,
-      maxTokens: tokenBudget(180, remaining),
+      maxTokens: tokenBudget(210, remaining),
     });
     const batch = Array.isArray(result.questions) ? result.questions.filter(isValidMCQ) : [];
     for (const q of batch) {
@@ -280,7 +304,7 @@ export async function generateCodingProblem(apiKey, difficulty) {
 Base it on this core technique: ${topic}. Wrap it in this scenario: ${flavor}. ${difficultyNote}
 Do not reuse a well-known textbook problem verbatim (e.g. plain "reverse a string", "FizzBuzz", "check palindrome") — invent a distinct problem that uses the technique.
 
-Before finalizing: mentally trace through the actual algorithm for each test case input you write, step by step, and confirm the output you wrote is EXACTLY what that algorithm produces (including formatting, spacing, and edge cases like empty input or ties) — do not guess an output.
+Before finalizing: mentally trace through the actual algorithm for each test case input you write, step by step, and confirm the output you wrote is EXACTLY what that algorithm produces (including formatting, spacing, and edge cases like empty input or ties) — do not guess an output. Do this tracing silently in your own reasoning — do NOT include your step-by-step trace anywhere in the output JSON.
 
 Return JSON:
 {
