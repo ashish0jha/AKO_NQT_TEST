@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "https://ako-nqt-test.onrender.com",
+      "/api": "http://localhost:5000",
     },
   },
 });
